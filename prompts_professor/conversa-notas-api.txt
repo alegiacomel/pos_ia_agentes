@@ -1,0 +1,246 @@
+# Criação de agentes autônomos
+
+## Módulo 1
+
+*** Mudar para "Interative"
+
+
+Crie o esqueleto de um projeto Node.js chamado notas-api:
+- git inicializado
+- package.json com "type": "module"
+- dependencias: zod; dev: typescript, tsx, @types/node
+- tsconfig.json com target ES2022, module e moduleResolution NodeNext, strict, esModuleInterop, skipLibCheck e forceConsistencCasingInFileNames true, outDir dist, rootDir src, include ["src"]
+- scripts npm: dev = "tsx scr/index.ts", cli = "tsx src/cli.ts";
+test = "node --import tsx --test/"src/**/*.test.ts;
+typecheck = "tsc --noEmit"
+- .gitignore cobrindo node_modules, .env, .env.*, dist
+Não crie nenhum arquivo em src/ ainda. Ao final, rode npm run typecheck para confirmar que está tudo válido
+
+----------------------------------
+*** Mudar para "plan"
+
+Crie um arquivo README.md que tenha informações úteis sobre o projeto, e também sobre como inicializar e executar esse projeto.
+
+----------------------------------
+*** Mudar para "Interative"
+
+
+Crie .github/copilot-instructions.md, a memória do projeto, injetada em toda conversa; precisa ser CURTA e FACTUAL. Seções:
+- Stack: node 22 LTS, typescript ESM strict, zod na fronteira(HTTP/CLI); testes com node:test via tsx, sem framework HTTP (node:http de propósito)
+- Comandos: dev (API em localhost:3000), cli, test e typecheck, extraia do package.json, uma linha cada.
+- Estrutura: src/domain (tipos+zod, sem IO), src/store (persistência in-memory atrás de interface), src/service (regras), src/http, src/cli.ts, specs/ (spec-driven).
+- Convenções: camadas não pulam (http/cli -> service -> store); entrada externa validada pelo zod; erros de domínio são classes traduzidas na borda; lógica nova nasce com teste; typecheck e test sempre verdes; Nunca commitar segredos (screts) nem ler .env.
+- Fluxo de trabalho: /expecificar -> /planejar -> /tarefas -> /implementar, com revisão humana entre as fases; artefatos em specs/. Máximo ~40 linhas; Nada de manual de estilo;
+
+----------------------------------
+
+---
+applyTo: "src/service/**"
+---
+Regras de service: funções puras onde possível; nunca importar de src/http
+
+----------------------------------
+
+execute os testes
+
+----------------------------------
+em settings, procurar por "terminal autoaprove
+
+editar settings.json
+
+    "chat.tools.terminal.autoApprove": {
+
+        // allow list - roda sem poop-up
+        "npm run": true,
+        "npm test": true,
+        "node": true,
+        "/^git (status| diff|add|commit)\\b/": true,
+
+        // denay list - roda com poop-up
+        "rm -fr": false,
+        "sudo": false,
+        "/^git push\\b.*--force/": false,
+        "cat .env": false,
+
+----------------------------------
+
+---
+applyTo: "src/service/**"
+---
+
+----------------------------------
+
+Crie um arquivo NOVO em specs/constitution.md com o conteúdo que vou editar.
+Não altere nenhum arquivo existente 
+
+# Constitutuion - Notas API
+
+Princípios não-negociáveis que toda spec, plano, tarefa e código seguem.
+1. Camadas explícitas. Dependências fluem http/cli -> service -> store. Domínio não faz IO.
+2. Validações na fronteira. Toda entrada externa é validada com zod antes de virar domínio.
+3. Erros são de domínio. Falhas previsíveis viram classes de erro traduzidas em status/saída na borda.
+4. Teste é parte da tarefa Nenhuma lógica entra sem teste. typecheck e test sempre verdes.
+5. Segurança por padrão. Sem segredos no repo. Ações destrutivas passam por guardrails (deny list + pre-commit), não pela confiança no modelo.
+6. Spec antes de código. Mudanças relevantes passam por spec -> plan -> task -> implement, com revisão humana entre as fases.
+7. Pequeno e reversível. Cada tarefa cabe em um commit.
+
+## Stack obrigatória
+
+Node 22, Typescript ESM strict, zod, node:test via tsx, node:http
+
+----------------------------------
+
+Crie o arquivo .github/prompts/especificar.prompt.md
+
+---
+mode: agent
+description: Cria a especificação (o QUE e por quê) de uma feature, sem código.
+---
+
+Escreva uma ESPECIFICAÇÃO para a feature descrita a seguir:
+
+Regras:
+
+- Leia specs/constitution.md e respeite todos os princípios.
+- NÃO escreva código nem decisões de implementação
+- Crie specs/<NNN>-<slug>spec.md (próximo número livre) com:
+  1. Contexto/problema. 2. User Stories ("Com <papel>, quero <Objetivo>, para <benefício>. 3. Requisitos funcionais numerados (RF-1...).
+  2. Critérios de aceite em EARS ("Quando <evento>, o sistema deve <resposta>". 4. Fora de escopo. 6. Questões em aberto) (verifique se a numeração que passei para os tópicos está correta)
+  
+  - Se algo estiver ambíguo, PERGUNTE antes de finalizar
+  
+----------------------------------
+
+Crie em notas-api/.github/prompts/planejar.prompt.md
+
+---
+mode: agent
+description: Gera o plano técnico (COMO) a partir de uma spec existente.
+---
+
+Gera o PLANO TÉCNICO da feature indicada (o texto após o comando é o número ou o caminho)
+
+- leia a spec.md da feature e a specs/constitution.md
+- crie plan.md na mesma pasta da spec, contendo?
+1. Arquitetura - camadas/arquivos criados ou alterados (htp/cli -> service -> store).
+2. Modelode dados - tipos e schemas zod.
+3. Contratos - rotas HTTP e/ou comandos de CLI, com entrada/saída.
+4. Decisões e trade-offs.
+5. Estratégia de testes (node:test).
+- Não implemente nada ainda. Aponte riscos que precisam de decisão humana.
+
+
+----------------------------------
+
+Crie em notas-api/.github/prompts/tarefas.prompt.md
+
+---
+mode: agent
+description: Quebra o plano em tarefas pequenas, ordenadas e testáveis.
+---
+
+Gere o tasks.md da feature indicada(o texto após o comando é o número ou caminho).
+
+- Leia a spec.md e plan.md da feature.
+- Lista numerada em cada tarefa:
+  - é pequena o suficiente para um único commit;
+  - tem critério claro de "pronto" (ex: teste X passa);
+  - declara dependências, quando houver;
+  - começa com "- [ ]"  para marcarmos o progresso.
+- Ordene por dependência. Não implemente nada.  
+
+----------------------------------
+
+Crie em notas-api/.github/prompts/implementar.prompt.md
+
+---
+mode: agent
+description: Implemente as tarefas pendentes uma-a-uma, com testes.
+---
+
+Implemente as tarefas de tasks.md da feature indicada (texto após o comando).
+
+uma tarefa por vez
+
+1. Escolha a próxima "- [ ]" cujas dependências já estão prontas.
+2. Implemente seguindo plan.md, as intructions e a constitution.
+3. Escreva/atualize testes e rode npm run test e npm run typecheck.
+4. Só marque "- [X}" quando estiver verde.
+5. Pare ao conlcuir uma fatia coesa e peça revisão.
+   Nunca desative teste/tipos para "passar". Se a spec estiver errada, pare e avise.
+   
+----------------------------------
+
+/especificar gerenciamento de tarefas: criar com título, listar (all/open/;done), concluir e remover, via THHP, e CLI
+
+----------------------------------
+
+/planejar 001
+
+----------------------------------
+*** Opcional ?
+
+ajuste no arquivo de prompt, tanto para planejar e tarefas, para que ele respeite o nome do arquivo criado utilizando a numeração que foi feita anteriormente na tarefa especificada, ou usando o número passado na frente do comando
+
+----------------------------------
+
+/tarefas 001
+
+----------------------------------
+
+/implementar 001
+
+----------------------------------
+
+**** guardrail
+**** deve ter configurado "core.hooksPath", senão não funciona !!
+
+
+Crie o hook a mão, novo arquivo .githooks/pre-commit
+
+set -e
+echo "pre-commit: typecheck..." && npm run typecheck
+echo "pre-commit: tests..." && npm run test
+
+----------------------------------
+
+quebre o tipo de retorno de list() em task-store.ts e commite com a mensagem "teste"
+
+----------------------------------
+
+Ajuste o código para que volte a funcionar
+
+----------------------------------
+npm run dev  (sobe o server na porta 3000)
+
+curl -X POST http://localhost:3000/tasks \
+  -H "content-tyupe: application/json" \
+  -d '{"title": "Ajustar a linha de comando"}
+
+curl http://localhost:3000/tasks 
+
+derruba server
+
+npm run cli -- task create --title "Criar novo agente"
+
+npm run cli -- task list
+
+----------------------------------
+
+/especificar 002 ajusta a linha de comando para ter um arquivo em memória .json que salva as tarefas entre as sessões de linha de comando
+----------------------------------
+/planejar 002
+----------------------------------
+/tarefas 002
+----------------------------------
+/implementar 002
+----------------------------------
+*** Exercício
+
+/especificar 003 tanto a linha de comando como o servidor http´utilizem a mesma base dados, armazenando em banco de dados sql
+
+----------------------------------
+
+----------------------------------
+
+

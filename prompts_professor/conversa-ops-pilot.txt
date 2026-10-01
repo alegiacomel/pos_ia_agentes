@@ -1,0 +1,776 @@
+# Criação de agentes autônomos
+
+
+----------------------------------
+----------------------------------
+*** MÓDULO 2
+----------------------------------
+----------------------------------
+
+**** Definir o BD antes.
+   o professor utiliza mysql, mas localmente estou com PostgreSQL. 
+   Isso impactou em alteração posterior.
+****
+
+ Utilizando o github speckit
+
+O SDD já existe (speckit)
+
+aki vamos definir a estratégia.
+
+----------------------------------
+
+*** Instalar o kit
+
+uv tool install specify-cli
+specify init my-project --integration copilot
+cd my-project
+----------------------------------
+
+Crie o esqueleto de um projeto Node.js chamado ops-pilot:
+- git inicializado
+- package.json com "type": "module"
+- dependencias: zod; @langchain/core, @langchain/openai,@langchain/langgraph, nao instale o dotenv utilize a opção nativa do node, express, sequelize, PostgreSQL
+- dev: typescript, tsx, @types/node, @types/express, @types/sequelize(caso tenha)
+- scripts: dev = "tsx src/index.ts; arena = "tsx src/arena.ts";bench = "src/bench.ts"; test = node --import tsx --test \~src/**/*.test.ts\"";typecheck = "tsc --noEmit
+- .gitignore: node_modules, .env, .env.*, dist
+- .env.example com OPENROUTER_API_KEY= e OPENROUTER_MODEL=
+Não crie arquivos em src/ ainda(apenas um vazio para o typecheck)
+Rode npm run typecheck ao final
+
+----------------------------------
+
+Crie .github/copilot-instructions.md deste projeto (CURTO e FACTUAL): 
+OpsPilot, copiloto de plantão que gerencia alertas e incidentes de produção; a API é um agente LangChain/LangGraph sobre OpenRouter.
+Stack:
+- Node.js 22 LTS.
+- TypeScript em ESM, com `strict` habilitado.
+- Zod na fronteira (HTTP/CLI) para validar entrada e saída.
+- Testes com `node:test` via `tsx`.
+- Express com PostgreSQL como banco
+
+Comandos: pegue do @package.json
+
+Convenções:
+## Convenções
+- Camadas padrão: MVC (Model, Service, Controller).
+- Toda entrada externa é validada pelo Zod.
+- Erros de domínio são classes traduzidas na borda.
+- Lógica nova nasce com teste.
+- `npm run typecheck` e `npm test`  sempre verdes
+- Nunca commitar segredos nem ler `.env`.
+- Sempre utilize funções puras.
+
+Fluxo: Seguir o fluxo do Spec Kit (Github Copilot). Specs devem ser versionadas. Depois crie o .vscode/settings.json com a seguinte allow/deny list (para o agente):
+allow: npm run, npm run test, npx tsc, node, git status/diff/add/commit;
+deny: rm -rf, sudo, git push --force e leitura de .env no terminal - git push fica fora da allow list: aprovação manual.
+
+
+----------------------------------
+*** ctrl+shift+'  =>> abre o terminal
+
+specify init .
+
+----------------------------------
+
+@copilot-instructions.md atualize a parte de fluxo, o fluxo será o seguinte:
+(/speckit.specify -> /speckit.plan -> /speckit.task -> /speckit.implement)
+
+----------------------------------
+*** copiar specs/constitution.md do projeto anterior (trecho abaixo)
+
+
+---
+# Constitutuion - Notas API
+
+Princípios não-negociáveis que toda spec, plano, tarefa e código seguem.
+1. Camadas explícitas. Dependências fluem http/cli -> service -> store. Domínio não faz IO.
+2. Validações na fronteira. Toda entrada externa é validada com zod antes de virar domínio.
+3. Erros são de domínio. Falhas previsíveis viram classes de erro traduzidas em status/saída na borda.
+4. Teste é parte da tarefa Nenhuma lógica entra sem teste. typecheck e test sempre verdes.
+5. Segurança por padrão. Sem segredos no repo. Ações destrutivas passam por guardrails (deny list + pre-commit), não pela confiança no modelo.
+6. Spec antes de código. Mudanças relevantes passam por spec -> plan -> task -> implement, com revisão humana entre as fases.
+7. Pequeno e reversível. Cada tarefa cabe em um commit.
+
+## Stack obrigatória
+
+Node 22, Typescript ESM strict, zod, node:test via tsx, node:http
+----
+
+
+Atualize o @constitution.md, pois ele é do nosso projeto antigo, coloque as diretrizes no mesmo formato, porem seguindo que temos no @package.json @copilot-instructions.md
+
+----------------------------------
+Não deu certo, pois as camadas e fluxos são do MVC comum, atualize isso. E atualize o constitution ou similar do próprio speckit
+----------------------------------
+
+Replique a lógica para ./.specify/memory/constitution.md
+
+*** apagar diretório specs
+----------------------------------
+
+/speckit.specify Núcleo de raciocínio do OpsPilot:
+
+- Interface comum ReasoningStrategy: name + run(input) -> (answer, trace, metrics). trace = eventos tipados (thought | action | observation | plan | critique | answer; action carrega (tool, args)). metrics = ( llmCalls, latencyMs).
+Fábrica única em src/agents/model.ts lendo OPENROUTER_API_KEY e OPENROUTER_MODEL (baseURL do OpenRouter), temperature 0.
+- Ferramentas mock em src/agents/tools.ts sobre um store in-memory pré-populado (o seed primário: 5 serviços, 6 alertas variados - 3 firing, 3 resolved (crie um script para rodar o seed, e execute ele ao final desse prompt)): list_alerts(status), open_incident(title, service, severity), resolve_incident(id). Schemas zod, banco PostgreSQL, utilizando sequelize.
+- Estratégia ReAct em src/agents/react.ts usando o agente ReAct pré-construído do LangGraph com essas tools, capturando o trace completo.
+- Estratégia Plan-and-Execute em src/agents/plan-and-execute.ts como grafo: planner (saída estruturada: lista de passos), executor(um passo por vez com as tools), replanner (revisa o restante após cada passo; encerra quando não resta nada). Máximo 8 passos.
+- Toda estratégia respeita limite de iterações e conta chamadas de LLM. Arena mínima em src/arena.ts: roda 1+ estratégias sobre o mesmo input e imprime traces e métricas (flags --strategies e --max-iterations).
+- Testes: store e formatação de trace (determinísticos, sem rede).
+
+----------------------------------
+
+/speckit.plan
+----------------------------------
+/speckit.tasks
+
+----------------------------------
+
+/speckit.implement
+
+use os seguintes exemplos para os códigos de seus respectivos arquivos:
+
+
+// referência para a factory src/agents/model.ts
+import { ChatOpenAI } from "@langchain/openai";
+
+export function createModel() {
+    return new ChatOpenAI({
+        modelName: process.env.OPENROUTER_MODEL ?? "",
+        apiKey: process.env.OPENROUTER_API_KEY ?? "",
+        configuration: { baseURL: "https://openrouter.ai/api/v1" },
+        temperature: 0,
+    });
+}
+
+// src/agents/tools.ts
+
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import { store } from "../ops-store.ts";
+
+export const listAlerts = tool({
+    async ({ status }) => JSON.stringify(store.listAlerts(status)),
+    name: "list_alerts",
+    description: "Lista os alertas de monitoramento. Use quando o plantonista perguntar o que está disparando, o estado dos serviços ou 'como está o plantão.' status: firing | resolved | all",
+    schema: z.object({
+        status: z.enum(["firing", "resolved", "all"]).default("firing"),
+    }),
+})
+
+
+// src/agents/react.ts
+
+import { createReactAgent } from "@langchain/langgraph/prebuild";
+
+export const reactStrategy = ReasoningStrategy = {
+    name: "react",
+    async run(input) {
+        const started = Date.now();
+        const agent = createReactAgent({
+            llm: createModel(),
+            tools: opsTools,
+        });
+        const result = await agent.invoke(
+            { messages: [{ role: "user", content: input }] },
+            {recursionsLimit: 12 }
+        ) // guardrail: nada de loop infinito
+        return {
+            answer: lastText(result.messages),
+            trace: toTrace(result.messages),
+            metrics: {llmCalls: countAiMessages(result.messages), latencyMs: Date.now() - started},
+        }
+    }
+}
+
+----------------------------------
+
+/speckit.implement implement o plan-execute para o nosso modelo do openrouter de acordo com os exemplos abaixo, executor  resolve com as tools, empurra para done, replanner decide se deve ajustar / seguir / encerrar; no total teto de 8 passos
+
+// implementar o plan-execute.ts seguindo o exemplo abaixo
+
+// o estado de referencia
+const PEState = Annotation.Root({
+	input: Annotation<string>(),
+	plan: Annotation<string>(),
+	done: Annotation<[string, string][]>({ reducer: (a, b) => a.concat(b), default: () => [] }),
+	answer: Annotation<string>(),
+})
+
+// o planner - referencia
+const planSchema = z.object({ 
+	steps: z.array(z.string()).describe("passos curtos, ordenados, executáveis com as ferramentas disponíveis"),
+});
+
+async functionn planner(state: typeof PEState.State) {
+	const plan = await createModel().withStructuredOutput(planSchema).invoke(
+	[["system", PLANNER_PROMPT], ["user", state.input]]
+	);
+	return { plan: plan.steps }
+}
+
+
+Execute o script de seed, e vamos usar por enquanto apenas o arquivo .json com as seeds para usar de base de dados, para o modelo ler o que já existe, ou, adicionar novos itens, faça essa modificação para ajustar a execução em memória para nossos testes. 
+
+----------------------------------
+
+*** ajustar package.json
+
+npm run arena -- "quantos alertas críticos estão disparando" --strategies react
+----------------------------------
+npm run arena -- "abra três incidentes sev2 para os alerts do checkout, payments e catalog, nessa ordem, e resolva o primeiro" --strategies plan-and-execute
+----------------------------------
+
+/speckit.specify Camada Reflection: withReflection(strategy, opts) decora qualquer ReasoningStrategy: executa a base; um crítico (mesmo modelo, saída estruturada { approved, feedback }) avalia a resposta contra as observações do trace; se reprovar, regenera com o feedback no contexto; para em approved ou maxReflections (default 2). Evento "critique" no trace; métricas soman as chamadas extras. Arena: reflect: react e reflect: plan-and-execute
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks 002-reflection-layer002-reflection-layer
+----------------------------------
+/speckit.implement na hora de executar o implement, leve em conta o exemplo abaixo
+ 
+// exemplo para implementação dentro do padrão de reflection
+const verdictSchema = z.object({
+    approved: z.boolean(),
+    feedback: z.string().describe("se aprovado: o que corrigir, em específico e acionável"),
+});
+	
+async function critique(input: string, result: ReasoningResult){
+	return createModel()
+	    .withStructuredOutput(verdictSchema)
+		.invoke([
+		["system", CRITIC_PROMPT], // avalie APENAS contra as observações do trace e do pedido
+		["user", `Pedido: ${input}\nObservações: ${observationsOf(result.trace)}\nResposta: ${result.answer}`],
+	]);
+}
+	
+----------------------------------
+npm run arena -- "faça um resumo do estado de plantão com uma recomendação do que atacar primeiro" --strategies react, reflect: react
+----------------------------------
+
+Crie src/bench.ts: 3 cenários x 2 estratégias (react, plan-and-execute), acerto verificado no ESTADO do store após rodar, tabela consolidada, 
+flags --scenario e --no-replanner. Cenários:
+C1 direto: quantos alertas críticso estão disparando?
+C2 estruturado: abra três incidentes sev2 para checkout, payment e catalog, nessa mesma ordem, e resolva o primeiro.
+C3: dinâmico: dos alertas disparando, abra um incidente para o mais antigo e diga quantos sobraram
+
+As colunas da tabela são, cenário, estratégia, acerto, llmCalls, latencyMs
+
+----------------------------------
+
+npm run bench
+
+----------------------------------
+/speckit.specify POST /chat em src/http/server.ts (ou padrão do express): body { message, strategy?, reflect? } validado com zod; default react. 
+200 { answer, trace, metrics }; 400 body inválido (issues do zod); 422 estratégia desconhecida; timeout 180s -> 504. Registry em src/agents/index.ts (nome -> estratégia; reflect aplica withReflection).
+Teste de integração com estratégia fake determinística, sem rede 
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit.implement 
+
+----------------------------------
+npm run dev
+----------------------------------
+curl -s localhost:3000/chat -X POST -H 'content-type: application/json' \
+  -d '{"message":"liste altertas ativos"}' | jq '{answer, llmCalls: .metrics.llmCalls}'
+----------------------------------
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"abra um incidente sev2 para o catalog", "strategy": "react", "reflect": true}' \
+| jq '{answer, llmCalls: .metrics.llmCalls}'
+
+----------------------------------
+----------------------------------
+MÓDULO 3
+----------------------------------
+----------------------------------
+
+Primeiro atualize a constitution do projeto, pois vamos utilizar o sqlite ao invés de um banco de dados tradicional
+
+/speckit.specify Persistência real de operações:
+- SqliteOpsStore (src/store/sqlite-ops-store.ts) implementa a interface OpsStore existente via node:sqlite (DatabaseSync); caminho em OPSPILOT_DB (default ./data/opspilot.db); ":memory:" nos testes
+- 4 tabelas - services, alerts, incidents, runbooks, espelhando os tipos atuais do domínio (incidents ganha resolved_at e summary, anuláveis); DDL idempotente no constructor: CHECK em todo campo de domínio fechado (tier , severity, status)
+- seed idempotente = cenário Mercadinho do mock (5 serviços, 6 alertas: 3 firing, 3 resolved; runbooks de checkout/payments/auth)
+- prepared statements em toda query; Sem SQL concatenado
+- tools novas: list_incidents(status open | resolved | all, default: open) e consultar_runbook(service) - descrições pelas 6 regras
+- composição injeta o SqliteOpsStore; mock en memory fica para testes e para o bench (cenários possam ser reproduzidos)
+- data/ no .gitignore
+- revisar descrições de src/agents/tools.ts pelas 6 regras (dívida do open_incident: quando usar; .describe() em todo campo; enums)
+- testes ":memory:" seed, abrir/listar/resolver, filtros e CHECKS; testes das tools existentes passam a rodar sobre ":memory:"
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+ 
+----------------------------------
+
+*** Na aula, em severidade, foi colocado como sev1, sev2 e sev3, posteriormente mudou
+*** para low, medium, high, critical. Já ajusto agora
+
+/speckit.implements Referência para implementação do sqlite-ops-StorageEvent
+
+import { DatabaseSync } from "node:sqlite"
+import type { OpsStore, Incident, IncidentFilter } from "./ops-store.ts"
+
+export class SqliteOpsStore implements OpsStore {
+    _db: DatabaseSync;
+	constructor(path = process.env.OPSPILOT_DB ?? "./data/opspilot.db") {
+	    this._db = new DatabaseSync(path);
+		this._db.exec(`
+			CREATE TABLE IF NOT EXISTS incidents (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			service_id TEXT NOT NULL,
+			severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+			status TEXT NOT NULL CHECK (status IN ('open', 'mitigated', 'resolved')),
+			created_at DATATIME DEFAULT CURRENT_TIMESTAMP,
+			resolved_at DATATIME,
+			sumary TEXT
+			);
+		` // + services, alerts, runbooks e o seed idempotente do Mercadinho
+		);
+	}
+
+    listIncidents(filter: IncidentFilter): Incident[] {
+	    const where = filter === "all" ? "": `WHERE status = ?`;
+		const stmt = this._db.prepare(`SELECT incidents ${where} ORDER BY created_at`);
+		return (filter === "all" ? stmt.all() : stmt.all(filter)) as Incident[];
+	}
+	
+	// listAlerts(), openIncidents(), resolveIncident(), getRunbook(): mesmo padrão - preparade statement + retorno tipado
+}
+
+----------------------------------
+npm run test && npm run typecheck
+----------------------------------
+
+**** restart no servidor
+
+----------------------------------
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"o p99 do checkout passou de 2 segundos abra um incidente sev2 para checkout"}' \
+| jq -r '.answer'
+
+----------------------------------
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"quais incidentes estão abertos?"}' \
+| jq -r '.answer'
+
+----------------------------------
+/speckit.specify Tool de status de provedores externos:
+- Tool check_provider_status em src/agents/tools.ts: consulta a statuspage pública do provedor via API statuspage.io (sem chave):
+githut -> https://www.githubstatus.com/api/v2/status.json
+cloudflare -> https://www.cloudflarestatus.com/api/v2/status.json
+Parâmetro provider (enum: github | cloudflare, default "github", .describe explicando).
+Descrição orientada a quando usar: suspeita de problema externo, "é o nosso ou do provedor?", dependência fora do ar.
+- Resiliência: timeout de 5s via AbortSignal.timeout; falha de rede ou 5xx, UMA nova tentativa; resposta validada com zod
+({ status? {indicador, description }}); qualquer falha final retorna string de erro legível como resultado da tool (erro é observação - nunca lançar execeção para fora da tool).
+- Retorno: compacto (indicador + descrição, uma linha), para não inflar o contexto.
+- Teste: a função de fetch é injetável: testes cobrem sucesso, timeout e resposta inválida sem uso de rede (fake fetch)
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit-implement exemplo:
+Referência para implementação do retorno de status dos provedores de serviços
+
+const statusSchema = z.object({
+  status: z.object({ indicador: z.string(), description: z.string()
+});
+
+const STATUS_URL = {
+    github: 'https://www.githubstatus.com/api/v2/status.json',
+    claudflare: 'https://www.claudflarestatus.com/api/v2/status.json',	
+} as const;
+
+async function fetchProviderStatus(provider: keyof typeof, doFetch = fetch): Promise<string> {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+	    try {
+		const response = await doFetch(STATUS_URL[provider], {signal: AbortSignal.timeout(5000) });
+		if (response.status >= 500) throw new Error(`upstream ${response.status}`);
+		if (response.ok) return `status page de ${provider} respondeu HTTP ${response.status}`
+		const { status } = statusSchema.parse(await resonse.json());
+		return `${provider} está ${status.indicator} - ${status.description}`
+		} catch (error) {
+		  if (attempt === 2) return `não consegui consultar o status de ${provider} (${(error as Error).message}).
+		  Responda com base nos alertas internos e avise o plantonista da limitação `
+		}
+	} 
+	return "unreachable";
+}
+
+
+----------------------------------
+*** lavantar servidor antes (npm run dev)
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"o pagamento está falhando - é problema nosso ou do provedor? se for nosso, abra um incidente severidade baixa", "strategy":"react"}' \
+| jq -r '.answer'
+
+----------------------------------
+/speckit-specify MCP server do OpsPilot: src/mcp/server.ts com @modelcontextprotocol/sdk, transport stdio, expondo list_alerts, open_incident e resolve_incident - reutilizando o mesmo OpsStore e os mesmos schemas zod das tools existentes (uma única fonte de verdade). Nome do server: opspilot. Script npm: mcp = "tsx src/mcp/server.ts" (se precisar de env, alterar o script e carregar elas antes). REGRA CRÍTICA: nenhum console.log no server - no stdio o stdout é o canal do protocolo; diagnóstico vai para o stderr. Test: sobre o server e valida o list de tools.
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit-implement  exemplo:
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { SqliteOpsStore } from '../store/sqlite-ops-store.ts';
+
+const store = new SqliteOpsStore();
+const server = new McpServer({
+     name: 'opspilot'
+	 version: '1.0.0',
+});
+
+server.registerTool("open_incident", {
+    description: "Abre um novo incidente no OpsPilot. Use quando o usuário relatar um problema em produção ou pedir para registrar/abrir um incidente.",
+	inputSchema: {
+	    title: z.string().min(1).describe("Título curto do incidente"),
+		service_id: z.string().describe("serviço afetado (ex: checkout, payments)"),
+		severity: z.enum(['low', 'medium', 'high', 'critical']).describe("severidade do incidente"),
+		},
+	},
+	
+    async ({ title, service, severity }) => ({
+	    content: [{ type: "text", text: JSON.stringfy(store.openIncident(title, service, severity)) }]
+	})
+)
+
+// list_alerts e resolve_incident seguem o mesmo padrão
+
+await server.connect(new StdioServerTransport());
+console.error("opspilot MCP server: pronto (stdio)"); //stderr, nunca stdout
+	
+----------------------------------
+
+crie no OpsPilot um incidente de severidade low de teste para notifications
+
+----------------------------------
+*** criar arquivo ./vscode/mcp.json com o conteúdo:
+
+{
+    "servers": {
+        "opspilot": {
+            "type": "stdio",
+            "command": "npm",
+            "args": ["run", "--silent", "mcp"],
+        }
+    }
+}
+
+----------------------------------
+----------------------------------
+*** MÓDULO 4
+----------------------------------
+----------------------------------
+
+/speckit.specify Conversa persistente:
+- ConversationStore (append/lastMessages/create) + tabela messages como no SqliteOpsStore
+- /chat: conversationId opcional, devolvido na resposta
+- 12 últimas mensagens no prompt via composição; métrica historyMessages
+- testes ":memory:" + fake
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+
+/speckit.implement 
+referencia do que o agente deve montar
+
+export async function runChat(input: ChatInput) {
+  const conversationId = input.conversationId ?? conversations.create();
+  // buscando as ultimas 12 mensagens do historico da conversa
+  const history = conversations.lastMessages(conversationId, 12);
+  
+  conversations.append(conversationId, "user", input.message);
+  const result = await strategy.run({ message: input.message, history});
+  conversations.append(conversationId, "assistant", result.answer);
+  
+  return { conversationId, ...result, metrics: { ...result.metrics, historyMessages: history.lenght }};
+}
+
+----------------------------------
+*** no terminal
+
+CID=$(curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"me chame de Thiago e abra um low no auth"}' \
+| jq -r .conversationId)
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"qual o meu nome?", "conversationId":"$CID"}' \
+| jq -r .answer
+
+----------------------------------
+/speckit.specify Memória semântica: MemoryStore por userId - remember (dedup > 0.92), recal top-3 por produto escalar (min 0.3), forget; tabela memories, embedding all-MiniLM-L6-v2 local em BLOB;
+/chat ganha userId e injeta o recall no prompt; teste: recall acha fato sem palavra em comum. 
+user: @huggingface/transformers com poooling: mean + normaliza: true e lazy singleton src/memory/embeddings.ts e src/memory/memory-store.ts.
+As colunas de memories (id, user_id, fact, embedding, created_at)
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+
+----------------------------------
+/speckit.implement
+
+referencia para o recall
+
+async function recall(userId: string, query: string, k = 3): Promise<Memory[]> {
+  const q = await embed(query)
+  return this._all(userId).map(mappedUser => ({ ...mappedUser, score: dot(q, mappedUser.embedding)})).sort((a,b) => b.score - a.score).slice(0,k).filter(mappedUser.score > 0.3) // relevancia minima
+ }
+  
+----------------------------------
+/speckit.specify Refletor de aprendizado: após cada resposta, um withStructuredOutput({ hasLearning, fact }) lê a última mensagem do usuário e destila fatos duráveis (nunca pedido pontual, nunca segredo) -> memories.remember assíncrono;tool forget_preference
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+
+----------------------------------
+/speckit.implement
+----------------------------------
+*** no terminal
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"abra um incidente low para o notifications: fila de e-mails atrasada","userId":"u-42"}' \
+| jq -r .answer
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"abra um incidente high para o catalog: busca lenta no p95","userId":"u-42"}' \
+| jq -r .answer
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"abra um incidente critical para o checkout: p99 acima de 2s e carrinho falhando","userId":"u-42"}' \
+| jq -r .answer
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"liste os incidentes abertos com a severidade de cada um","userId":"u-42"}' \
+| jq -r .answer
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"userId":"u-42", "fact": "prefere os alertas críticos primeiro"}' \
+| jq -r .
+
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"organize meu plantão","userId":"u-42"}' \
+| jq '{.answer, r: .metrics.memoriesRecalled}'
+
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"organize meu plantão gostaria de ver os incidentes abertos status firing em primeiro e os resolved por último","userId":"u-42"}' \
+| jq '{.answer, recalledMemories: .metrics.recalledMemories, historyMessages: . metrics.historyMessages}'
+
+
+----------------------------------
+----------------------------------
+*** MÓDULO 5
+----------------------------------
+----------------------------------
+
+*** Ver scrip conversa_longa.sh (no git)
+*** Não executar. Gasta muito token
+
+----------------------------------
+/speckit-specify
+
+Instrumente a medição de contexto: src/context/tokens.ts com estimateTokens (chars/4) e o usage real do LangChain; métricas do /chat com promptTokens real e contextBreakdown estimado por fontes; conversa-longa.sh imprime o promptTokens por turno. Com testes
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+
+----------------------------------
+/speckit.implement
+----------------------------------
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"como está o plantão?", "userId":"u-42"}' \
+| jq '.metrics | {promptTokens, contextBreakdown}' 
+
+----------------------------------
+/speckit-specify Sumarização de histórico (prunning): tabela conversation_summaries; o que sai das 8 mensagens recentes vira resumo de ~150 tokens preservando decisões, fatos e pendências, MESCLADO ao resumo anterior e persistido - refeito só quando 8 novas saem da janela, nunca a cada request. Resumo entra no contexto; evento "summarize. Com teste fake.
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit.implement
+
+const SUMMARIZER_PROMPT = `Comprima o trecho de conversa a seguir em no máximo 150 tokens, preservando obrigatoriamente: decisões tomadas, fatos estabelecidos (nomes, datas, prazos, preferências), incidentes abertos/resolvidos e pendências abertas. Descarte cumprimentos e conversa social. Se houver um resumo anterior, incorpore-o. Responda só o resumo, em tópicos telegráficos`
+
+----------------------------------
+***  rodar conversa-longa.sh (by git)
+----------------------------------
+
+CID=03dc.....
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"o que decidimos sobre os deploys?", "conversationId":"'$CID'"}' \
+| jq -r '.answer' 
+  
+----------------------------------
+/speckit-specify ContextBuilder com orçamento por seção: src/context/context-builder.ts monta o prompt de TODAS as estratégias com teto por seção via env CONTEXT_BUDGET_*: system e mensagem intocáveis, resumo 200, janela 1200(cora as mais antigas), memórias 300 (corta menor score). Teste: tetos baixos cortam na ordem certa
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit.implement
+
+export function buildContext(input: BuildInput): BuildContext {
+  const sections = [
+    section("system", SYSTEM_PROMPT, { budget: B.system, cut: "never"}),
+    section("summary", conversations.summaryOf(input.conversationId), { budget: B.summary, cut: "never"}),
+    section("history", conversations.lastMessages(input.conversationId, 8), { budget: B.history, cut: "oldest-first"}),
+    section("memories", memories.recall(input.userId, input.message, 3), { budget: B.memories, cut: "lowest-score-first"}),	
+	]
+	const fitted = sections.map(fitToBudget) // aplica teto e regra de corte por seção
+	return assemble(fitted, input.message) // + breaddown por seção
+}
+	
+----------------------------------
+*** alterar .env para incluir as variáveis de context
+----------------------------------
+CID=03dc.....
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"como está o plantão:", "userId":"u-plantao", "conversationId":"'$CID'"}' \
+| jq '.metrics.contextBreakdown' 
+
+----------------------------------
+----------------------------------
+*** MÓDULO 6
+----------------------------------
+----------------------------------
+
+/speckit-specify Grafo unificado:
+- production-graph.ts: nós contexto, roteador, as 3 estratégias como nós e resposta.
+- Roteador: withStructuredOutput (route, reason); tabela no prompt;evento "route" e campo node em todo evento de trace.
+- /chat: strategy opcional (se vier, é o override no trace)
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit.implement
+src/graph/production-Graph.ts
+
+const graph = new StateGraph(GraphState)
+  .addNode("contexto", contextNode)
+  .addNode("roteador", routerNode)
+  .addNode("react", reactNode)
+  .addNode("planExecute", planExecuteNode)
+  .addNode("reflect", reflectNode)
+  .addNode("resposta", answerNode)
+  .addEdge("START", "contexto")
+  .addConditionalEdges("roteador", (s) => s.route, {
+    "react": "react",
+	"planExecute": "planExecute",
+	"reflect": "reflect",
+  })
+  .addEdge("react", "resposta")
+  .addEdge("planExecute", "resposta")
+  .addEdge("reflect", "resposta")
+  .addEdge("resposta", "END")
+  .compile()
+
+// parte esquema
+
+const routeSchema = z.object({
+  route: z.enum(["react", "planExecute", "reflect"]),
+  reason: z.string().describe("uma frase justificando a escolha"),
+  })
+
+async function routerNode(state: typeof GraphState.State({
+  const verdict = await createModel().withStructuredOutput(routeSchema).invoke([
+    ["system", SYSTEM_PROMPT],
+	["user", state.input],
+	])
+  trace.push({
+    node: "roteador",
+	type: "route",
+	route: verdict.route,
+	reason: verdict.reason,
+	})
+  return { route: verdict.route }
+}  
+    
+----------------------------------
+curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"quantos alertas criíticos?", "userId":"u-42"}' \
+| jq '.metrics|{route, routeReason}' 
+
+----------------------------------
+
+/speckit.specify Resilência de modelo:
+- .env: OPENROUTER_MODEL_FALLBACK
+- fábrica model.ts: withRetry no primário; withFallbacks([reserva])
+- Trace: evento "fallback"; metrics.modelUsed.
+- Caso nada funcione, 503
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+
+----------------------------------
+
+/speckit.implement
+
+export function creteModel() {
+  const primary = baseModel(process.env.OPENROUTER_MODEL!).withRetry({ stopAfterAttempt: 2 })
+  const backup = baseModel(process.env.OPENROUTER_MODEL_FALLBACK!).wihRetry({ stopAfterAttempt: 2 })
+  return primary.withFallback(backup)
+}
+
+
+*** incluir no .env a variável:
+OPENROUTER_MODEL_FALLBACK=openrouter/deepseek-r1:free
+
+----------------------------------
+----------------------------------
+
+----------------------------------
+----------------------------------
+*** MÓDULO 7
+----------------------------------
+----------------------------------
+
+----------------------------------
+----------------------------------
+----------------------------------
