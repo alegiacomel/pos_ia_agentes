@@ -556,38 +556,38 @@ async function recall(userId: string, query: string, k = 3): Promise<Memory[]> {
 
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"abra um incidente low para o notifications: fila de e-mails atrasada","userId":"u-42"}' \
+-d '{"message":"abra um incidente low para o notifications: fila de e-mails atrasada","userId":"U-42"}' \
 | jq -r .answer
 
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"abra um incidente high para o catalog: busca lenta no p95","userId":"u-42"}' \
+-d '{"message":"abra um incidente high para o catalog: busca lenta no p95","userId":"U-42"}' \
 | jq -r .answer
 
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"abra um incidente critical para o checkout: p99 acima de 2s e carrinho falhando","userId":"u-42"}' \
+-d '{"message":"abra um incidente critical para o checkout: p99 acima de 2s e carrinho falhando","userId":"U-42"}' \
 | jq -r .answer
 
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"liste os incidentes abertos com a severidade de cada um","userId":"u-42"}' \
+-d '{"message":"liste os incidentes abertos com a severidade de cada um","userId":"U-42"}' \
 | jq -r .answer
 
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"userId":"u-42", "fact": "prefere os alertas críticos primeiro"}' \
+-d '{"userId":"U-42", "fact": "prefere os alertas críticos primeiro"}' \
 | jq -r .
 
 
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"organize meu plantão","userId":"u-42"}' \
+-d '{"message":"organize meu plantão","userId":"U-42"}' \
 | jq '{.answer, r: .metrics.memoriesRecalled}'
 
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"organize meu plantão gostaria de ver os incidentes abertos status firing em primeiro e os resolved por último","userId":"u-42"}' \
+-d '{"message":"organize meu plantão gostaria de ver os incidentes abertos status firing em primeiro e os resolved por último","userId":"U-42"}' \
 | jq '{.answer, recalledMemories: .metrics.recalledMemories, historyMessages: . metrics.historyMessages}'
 
 
@@ -615,7 +615,7 @@ Instrumente a medição de contexto: src/context/tokens.ts com estimateTokens (c
 ----------------------------------
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"como está o plantão?", "userId":"u-42"}' \
+-d '{"message":"como está o plantão?", "userId":"U-42"}' \
 | jq '.metrics | {promptTokens, contextBreakdown}' 
 
 ----------------------------------
@@ -731,7 +731,7 @@ async function routerNode(state: typeof GraphState.State({
 ----------------------------------
 curl -s localhost:3000/chat -X POST \
 -H 'content-type: application/json' \
--d '{"message":"quantos alertas criíticos?", "userId":"u-42"}' \
+-d '{"message":"quantos alertas criíticos?", "userId":"U-42"}' \
 | jq '.metrics|{route, routeReason}' 
 
 ----------------------------------
@@ -771,6 +771,88 @@ OPENROUTER_MODEL_FALLBACK=openrouter/deepseek-r1:free
 ----------------------------------
 ----------------------------------
 
+/speckit.specify Trace persistido + logs JSON:
+- /chat: requestId no corpo e no header X-Request-Id
+- SQLite: requests (métricas) e trace_events (node, payloads).
+- src/obs/logger.ts: 1 linha JSON por evento, só metadados.
+- GET /requests/:id registro + trace ordenado.
+
 ----------------------------------
+/speckit.plan
 ----------------------------------
+/speckit.tasks
 ----------------------------------
+
+/speckit.implement
+async function aswerNode(state: typeof GraphState.State) {
+  // grava histórico, disparava reflector
+  
+  requests.save({
+    id: state.requestId,
+	userId: state.userId,
+	route: state.route,
+	modelUsed: state.result.metrics.modelUsed,
+	promptTokens: state.result.metrics.promptTokens,
+	latencyMs: state.result.metrics.latencyMs,
+	status: "ok"
+  })
+  state.result.trace.forEach((e, seq) => traceEvents.save({
+    requestId: state.requestId,
+	seq,
+	node: e.node,
+	type: e.type,
+	payload: e,
+  }))
+  log.info({ requestId: state.requestId, node: "resposta", type: "done", route: state.route, tokens: state.result.metrics.promptTokens }) 
+  return state
+ }
+ 
+----------------------------------
+RID=$(curl -s localhost:3000/chat -X POST \
+-H 'content-type: application/json' \
+-d '{"message":"resolva o incidente mais antigo", "userId":"U-42"}' \
+| jq .requestId)
+
+curl -s localhost:3000/requests/$RID | jq .
+
+----------------------------------
+*** Comando sem utilizar o speckit. Digitar/colar como está no agente
+
+Crie GET /stats?since=24h sobre requests: total, erros, tokens, custo (:free=0), p50/p95, por rota e modelo
+
+----------------------------------
+npm run dev
+
+curl -s localhost:3000/stats?:since=24h | jq .
+
+----------------------------------
+
+----------------------------------
+
+----------------------------------
+
+----------------------------------
+
+----------------------------------
+
+----------------------------------
+
+----------------------------------
+
+----------------------------------
+
+----------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
