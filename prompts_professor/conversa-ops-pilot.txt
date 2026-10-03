@@ -826,14 +826,55 @@ npm run dev
 curl -s localhost:3000/stats?:since=24h | jq .
 
 ----------------------------------
+----------------------------------
+*** MÓDULO 8
+----------------------------------
+----------------------------------
+
+*** não utilizou speckit para isso
+
+Crie .github/instructions/design.instructions.md (crie um similar para o cursor aso necessário) com applyTo: "web/**": hierarquia, espaçamento em escala, estados vazios e de erro, dark mode, acessibilidade.
 
 ----------------------------------
 
+/speckit.specify War room web/ (Vite+react+TS) com as instructions de design: chat -> /chat, com "ver raciocínio" abrindo o trace tipado. 202 vira cartão aprovar/negar; engrenagem com URL da API; base /opspilot/; CORS
+
 ----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit.implement
+----------------------------------
+
+/speckit.specify  Deploy do web/ no Pages  via Actions:
+upload-pages-artifact + deploy-pages, permissions, README (atualizar)
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+----------------------------------
+/speckit.implement
+
+----------------------------------
+*** ao rodar, o professor notou um problema na ordenção e fez esse prompt para corrigir
+
+Faça uma correção para que o agente entenda isso de organizar com a listagem, mas tem que ser feito na memória do agente e não por uma função direto no servidor
 
 ----------------------------------
 
+Crie .github/workflows/deploy.yml para publicar a pasta web/ no Gihub Pages: dispara um push na main; job build com node 22, npm ci e npm run build dentro de web/, e actions/upload-pages-artifact com path web/dist; job deploy com actions/deploy-pages e environment github-pages; permissions contents; read, pages:write, id-token:write. 
+Confirme que web/vite.config.ts tem base: opspilot/
+
+*** se ocorrer problemas, corrigir junto com o agente. Te vira...
+
 ----------------------------------
+*** ver cloudflared tunnel install -> tunel para o localhost
+
+*** em terminal
+
+cloudflared tunnerl --url http://localhost:3000 --no-autoupdate
 
 ----------------------------------
 
