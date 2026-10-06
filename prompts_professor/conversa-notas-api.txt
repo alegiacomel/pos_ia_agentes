@@ -1,6 +1,10 @@
 # Criação de agentes autônomos
 
-## Módulo 1
+----------------------------------
+----------------------------------
+*** MÓDULO 1
+----------------------------------
+----------------------------------
 
 *** Mudar para "Interative"
 
@@ -240,7 +244,3 @@ npm run cli -- task list
 /especificar 003 tanto a linha de comando como o servidor http´utilizem a mesma base dados, armazenando em banco de dados sql
 
 ----------------------------------
-
-----------------------------------
-
-

@@ -7,16 +7,16 @@
 ----------------------------------
 ----------------------------------
 
-**** Definir o BD antes.
-   o professor utiliza mysql, mas localmente estou com PostgreSQL. 
-   Isso impactou em alteração posterior.
-****
+*** Definir o BD antes.
+***   o professor utiliza mysql, mas localmente estou com PostgreSQL. 
+*** Isso impactou em alteração posterior.
+***
 
- Utilizando o github speckit
+*** Utilizando o github speckit
 
-O SDD já existe (speckit)
+*** O SDD já existe (speckit)
 
-aki vamos definir a estratégia.
+*** aki vamos definir a estratégia.
 
 ----------------------------------
 
@@ -65,7 +65,6 @@ Fluxo: Seguir o fluxo do Spec Kit (Github Copilot). Specs devem ser versionadas.
 allow: npm run, npm run test, npx tsc, node, git status/diff/add/commit;
 deny: rm -rf, sudo, git push --force e leitura de .env no terminal - git push fica fora da allow list: aprovação manual.
 
-
 ----------------------------------
 *** ctrl+shift+'  =>> abre o terminal
 
@@ -79,8 +78,7 @@ specify init .
 ----------------------------------
 *** copiar specs/constitution.md do projeto anterior (trecho abaixo)
 
-
----
+*** INÍCIO do Constituion do projeto anterior:
 # Constitutuion - Notas API
 
 Princípios não-negociáveis que toda spec, plano, tarefa e código seguem.
@@ -95,13 +93,16 @@ Princípios não-negociáveis que toda spec, plano, tarefa e código seguem.
 ## Stack obrigatória
 
 Node 22, Typescript ESM strict, zod, node:test via tsx, node:http
-----
+*** FIM  do Constituion do projeto anterior.
 
+----------------------------------
 
 Atualize o @constitution.md, pois ele é do nosso projeto antigo, coloque as diretrizes no mesmo formato, porem seguindo que temos no @package.json @copilot-instructions.md
 
 ----------------------------------
+
 Não deu certo, pois as camadas e fluxos são do MVC comum, atualize isso. E atualize o constitution ou similar do próprio speckit
+
 ----------------------------------
 
 Replique a lógica para ./.specify/memory/constitution.md
@@ -192,22 +193,22 @@ export const reactStrategy = ReasoningStrategy = {
 
 // o estado de referencia
 const PEState = Annotation.Root({
-	input: Annotation<string>(),
-	plan: Annotation<string>(),
-	done: Annotation<[string, string][]>({ reducer: (a, b) => a.concat(b), default: () => [] }),
-	answer: Annotation<string>(),
+    input: Annotation<string>(),
+    plan: Annotation<string>(),
+    done: Annotation<[string, string][]>({ reducer: (a, b) => a.concat(b), default: () => [] }),
+    answer: Annotation<string>(),
 })
 
 // o planner - referencia
 const planSchema = z.object({ 
-	steps: z.array(z.string()).describe("passos curtos, ordenados, executáveis com as ferramentas disponíveis"),
+    steps: z.array(z.string()).describe("passos curtos, ordenados, executáveis com as ferramentas disponíveis"),
 });
 
 async functionn planner(state: typeof PEState.State) {
-	const plan = await createModel().withStructuredOutput(planSchema).invoke(
-	[["system", PLANNER_PROMPT], ["user", state.input]]
-	);
-	return { plan: plan.steps }
+    const plan = await createModel().withStructuredOutput(planSchema).invoke(
+    [["system", PLANNER_PROMPT], ["user", state.input]]
+    );
+    return { plan: plan.steps }
 }
 
 
@@ -236,16 +237,16 @@ const verdictSchema = z.object({
     approved: z.boolean(),
     feedback: z.string().describe("se aprovado: o que corrigir, em específico e acionável"),
 });
-	
+    
 async function critique(input: string, result: ReasoningResult){
-	return createModel()
-	    .withStructuredOutput(verdictSchema)
-		.invoke([
-		["system", CRITIC_PROMPT], // avalie APENAS contra as observações do trace e do pedido
-		["user", `Pedido: ${input}\nObservações: ${observationsOf(result.trace)}\nResposta: ${result.answer}`],
-	]);
+    return createModel()
+        .withStructuredOutput(verdictSchema)
+        .invoke([
+        ["system", CRITIC_PROMPT], // avalie APENAS contra as observações do trace e do pedido
+        ["user", `Pedido: ${input}\nObservações: ${observationsOf(result.trace)}\nResposta: ${result.answer}`],
+    ]);
 }
-	
+    
 ----------------------------------
 npm run arena -- "faça um resumo do estado de plantão com uma recomendação do que atacar primeiro" --strategies react, reflect: react
 ----------------------------------
@@ -285,6 +286,7 @@ curl -s localhost:3000/chat -X POST \
 -d '{"message":"abra um incidente sev2 para o catalog", "strategy": "react", "reflect": true}' \
 | jq '{answer, llmCalls: .metrics.llmCalls}'
 
+
 ----------------------------------
 ----------------------------------
 MÓDULO 3
@@ -321,30 +323,30 @@ import type { OpsStore, Incident, IncidentFilter } from "./ops-store.ts"
 
 export class SqliteOpsStore implements OpsStore {
     _db: DatabaseSync;
-	constructor(path = process.env.OPSPILOT_DB ?? "./data/opspilot.db") {
-	    this._db = new DatabaseSync(path);
-		this._db.exec(`
-			CREATE TABLE IF NOT EXISTS incidents (
-			id TEXT PRIMARY KEY,
-			title TEXT NOT NULL,
-			service_id TEXT NOT NULL,
-			severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
-			status TEXT NOT NULL CHECK (status IN ('open', 'mitigated', 'resolved')),
-			created_at DATATIME DEFAULT CURRENT_TIMESTAMP,
-			resolved_at DATATIME,
-			sumary TEXT
-			);
-		` // + services, alerts, runbooks e o seed idempotente do Mercadinho
-		);
-	}
+    constructor(path = process.env.OPSPILOT_DB ?? "./data/opspilot.db") {
+        this._db = new DatabaseSync(path);
+        this._db.exec(`
+            CREATE TABLE IF NOT EXISTS incidents (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            service_id TEXT NOT NULL,
+            severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+            status TEXT NOT NULL CHECK (status IN ('open', 'mitigated', 'resolved')),
+            created_at DATATIME DEFAULT CURRENT_TIMESTAMP,
+            resolved_at DATATIME,
+            sumary TEXT
+            );
+        ` // + services, alerts, runbooks e o seed idempotente do Mercadinho
+        );
+    }
 
     listIncidents(filter: IncidentFilter): Incident[] {
-	    const where = filter === "all" ? "": `WHERE status = ?`;
-		const stmt = this._db.prepare(`SELECT incidents ${where} ORDER BY created_at`);
-		return (filter === "all" ? stmt.all() : stmt.all(filter)) as Incident[];
-	}
-	
-	// listAlerts(), openIncidents(), resolveIncident(), getRunbook(): mesmo padrão - preparade statement + retorno tipado
+        const where = filter === "all" ? "": `WHERE status = ?`;
+        const stmt = this._db.prepare(`SELECT incidents ${where} ORDER BY created_at`);
+        return (filter === "all" ? stmt.all() : stmt.all(filter)) as Incident[];
+    }
+    
+    // listAlerts(), openIncidents(), resolveIncident(), getRunbook(): mesmo padrão - preparade statement + retorno tipado
 }
 
 ----------------------------------
@@ -391,23 +393,23 @@ const statusSchema = z.object({
 
 const STATUS_URL = {
     github: 'https://www.githubstatus.com/api/v2/status.json',
-    claudflare: 'https://www.claudflarestatus.com/api/v2/status.json',	
+    claudflare: 'https://www.claudflarestatus.com/api/v2/status.json',    
 } as const;
 
 async function fetchProviderStatus(provider: keyof typeof, doFetch = fetch): Promise<string> {
     for (let attempt = 1; attempt <= 2; attempt++) {
-	    try {
-		const response = await doFetch(STATUS_URL[provider], {signal: AbortSignal.timeout(5000) });
-		if (response.status >= 500) throw new Error(`upstream ${response.status}`);
-		if (response.ok) return `status page de ${provider} respondeu HTTP ${response.status}`
-		const { status } = statusSchema.parse(await resonse.json());
-		return `${provider} está ${status.indicator} - ${status.description}`
-		} catch (error) {
-		  if (attempt === 2) return `não consegui consultar o status de ${provider} (${(error as Error).message}).
-		  Responda com base nos alertas internos e avise o plantonista da limitação `
-		}
-	} 
-	return "unreachable";
+        try {
+        const response = await doFetch(STATUS_URL[provider], {signal: AbortSignal.timeout(5000) });
+        if (response.status >= 500) throw new Error(`upstream ${response.status}`);
+        if (response.ok) return `status page de ${provider} respondeu HTTP ${response.status}`
+        const { status } = statusSchema.parse(await resonse.json());
+        return `${provider} está ${status.indicator} - ${status.description}`
+        } catch (error) {
+          if (attempt === 2) return `não consegui consultar o status de ${provider} (${(error as Error).message}).
+          Responda com base nos alertas internos e avise o plantonista da limitação `
+        }
+    } 
+    return "unreachable";
 }
 
 
@@ -435,28 +437,28 @@ import { SqliteOpsStore } from '../store/sqlite-ops-store.ts';
 const store = new SqliteOpsStore();
 const server = new McpServer({
      name: 'opspilot'
-	 version: '1.0.0',
+     version: '1.0.0',
 });
 
 server.registerTool("open_incident", {
     description: "Abre um novo incidente no OpsPilot. Use quando o usuário relatar um problema em produção ou pedir para registrar/abrir um incidente.",
-	inputSchema: {
-	    title: z.string().min(1).describe("Título curto do incidente"),
-		service_id: z.string().describe("serviço afetado (ex: checkout, payments)"),
-		severity: z.enum(['low', 'medium', 'high', 'critical']).describe("severidade do incidente"),
-		},
-	},
-	
+    inputSchema: {
+        title: z.string().min(1).describe("Título curto do incidente"),
+        service_id: z.string().describe("serviço afetado (ex: checkout, payments)"),
+        severity: z.enum(['low', 'medium', 'high', 'critical']).describe("severidade do incidente"),
+        },
+    },
+    
     async ({ title, service, severity }) => ({
-	    content: [{ type: "text", text: JSON.stringfy(store.openIncident(title, service, severity)) }]
-	})
+        content: [{ type: "text", text: JSON.stringfy(store.openIncident(title, service, severity)) }]
+    })
 )
 
 // list_alerts e resolve_incident seguem o mesmo padrão
 
 await server.connect(new StdioServerTransport());
 console.error("opspilot MCP server: pronto (stdio)"); //stderr, nunca stdout
-	
+    
 ----------------------------------
 
 crie no OpsPilot um incidente de severidade low de teste para notifications
@@ -654,12 +656,12 @@ export function buildContext(input: BuildInput): BuildContext {
     section("system", SYSTEM_PROMPT, { budget: B.system, cut: "never"}),
     section("summary", conversations.summaryOf(input.conversationId), { budget: B.summary, cut: "never"}),
     section("history", conversations.lastMessages(input.conversationId, 8), { budget: B.history, cut: "oldest-first"}),
-    section("memories", memories.recall(input.userId, input.message, 3), { budget: B.memories, cut: "lowest-score-first"}),	
-	]
-	const fitted = sections.map(fitToBudget) // aplica teto e regra de corte por seção
-	return assemble(fitted, input.message) // + breaddown por seção
+    section("memories", memories.recall(input.userId, input.message, 3), { budget: B.memories, cut: "lowest-score-first"}),    
+    ]
+    const fitted = sections.map(fitToBudget) // aplica teto e regra de corte por seção
+    return assemble(fitted, input.message) // + breaddown por seção
 }
-	
+    
 ----------------------------------
 *** alterar .env para incluir as variáveis de context
 ----------------------------------
@@ -698,8 +700,8 @@ const graph = new StateGraph(GraphState)
   .addEdge("START", "contexto")
   .addConditionalEdges("roteador", (s) => s.route, {
     "react": "react",
-	"planExecute": "planExecute",
-	"reflect": "reflect",
+    "planExecute": "planExecute",
+    "reflect": "reflect",
   })
   .addEdge("react", "resposta")
   .addEdge("planExecute", "resposta")
@@ -717,14 +719,14 @@ const routeSchema = z.object({
 async function routerNode(state: typeof GraphState.State({
   const verdict = await createModel().withStructuredOutput(routeSchema).invoke([
     ["system", SYSTEM_PROMPT],
-	["user", state.input],
-	])
+    ["user", state.input],
+    ])
   trace.push({
     node: "roteador",
-	type: "route",
-	route: verdict.route,
-	reason: verdict.reason,
-	})
+    type: "route",
+    route: verdict.route,
+    reason: verdict.reason,
+    })
   return { route: verdict.route }
 }  
     
@@ -789,19 +791,19 @@ async function aswerNode(state: typeof GraphState.State) {
   
   requests.save({
     id: state.requestId,
-	userId: state.userId,
-	route: state.route,
-	modelUsed: state.result.metrics.modelUsed,
-	promptTokens: state.result.metrics.promptTokens,
-	latencyMs: state.result.metrics.latencyMs,
-	status: "ok"
+    userId: state.userId,
+    route: state.route,
+    modelUsed: state.result.metrics.modelUsed,
+    promptTokens: state.result.metrics.promptTokens,
+    latencyMs: state.result.metrics.latencyMs,
+    status: "ok"
   })
   state.result.trace.forEach((e, seq) => traceEvents.save({
     requestId: state.requestId,
-	seq,
-	node: e.node,
-	type: e.type,
-	payload: e,
+    seq,
+    node: e.node,
+    type: e.type,
+    payload: e,
   }))
   log.info({ requestId: state.requestId, node: "resposta", type: "done", route: state.route, tokens: state.result.metrics.promptTokens }) 
   return state
@@ -877,23 +879,59 @@ Confirme que web/vite.config.ts tem base: opspilot/
 cloudflared tunnerl --url http://localhost:3000 --no-autoupdate
 
 ----------------------------------
+----------------------------------
+*** MÓDULO 9
+----------------------------------
+----------------------------------
+*** ver protocolo agent-to-agent (google)
+
+/speckit-specify Modo equipe em src/team/: supervisor com withStructuredOutput({ next, brief }) sobre um blackboard no estado.
+Papéis: analista (só leitura, não propõe), planejador (sem tools), executor (incidentes, sem bypass). Evento "handoff" no trace, renderizado no "ver raciocínio". Rota "team", teto 8
+
+----------------------------------
+/speckit.plan
+----------------------------------
+/speckit.tasks
+
+----------------------------------
+/speckit.implement
+
+// exemplo de supervisor
+
+const nextSchema = z.object({
+  next: z.enum(["analista", "planejador", "executor", "done"]),
+  brief: z.string().describe("instrução de trabalho para o próximo papel (nó) ou resumo final se done"),
+  })
+  
+async function supervisor(state: typeof TeamState.State) {
+  const verdict = await createModel().withStructuredOutput(nextSchema).invoce([
+    ["system", SUPERVISOR_PROMPT], // papéis disponíveis + critérios de sequência
+    ["user", blackboardAsText(state)]
+  ])
+  trace.push({
+    type: "handoff",
+    from: "supervisor", 
+    to: verdict.next,
+    brief: verdict.brief,
+  })
+  return {
+    next: verdict.next,
+    brief: verdict.brief,
+  }
+}
+// aresta condicional: (s) => s.next -> analista, planejador, executor, done
+
+
+// exemplo de prompt do analista
+"Você é o ANALISTA do plantão. Sua única função: produzir diagnóstico FACTUAL do estado atual, as ferramentas de leitura. Liste: alertas disparando (com data e severidade), incidentes recentes (abertos e resolvidos), runbooks relevantes, status dos provedores e janelas/fatos conhecidos do time. NÃO proponha soluções. NÃO abra nem resolva nada.
+Formato: tópicos telegráficos. seja cético: se um dado não está nas observações não afirme"
+
 
 ----------------------------------
 
-----------------------------------
+*** rodar servidor node e o front 
 
 ----------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+*** no front
+Estamos com latência alta no checkout e 5xx no payments - conduza a resposta ao incidente: levante o que dispara, monte o plano e abra os incidentes
+----------------------------------
